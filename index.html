@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Теплорасчёт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: шапка с названием, ниже вкладки расчётов; в каждой вкладке слева исходные данные, справа результат. */
+:root {
+  --bg: #EDF0F3;
+  --surface: #F8FAFB;
+  --ink: #14202B;
+  --muted: #576676;
+  --line: #CBD3DB;
+  --accent: #C8400D;
+  --accent-ink: #FFFFFF;
+  --cold: #2C6E9B;
+  --layer-a: #E1E7ED;
+  --layer-b: #D3DBE3;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F161D; --surface: #17212A; --ink: #E6ECF1; --muted: #93A1AE; --line: #2B3947;
+    --accent: #F0743F; --accent-ink: #1A0E08; --cold: #6FB0DC; --layer-a: #1D2934; --layer-b: #25333F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F161D; --surface: #17212A; --ink: #E6ECF1; --muted: #93A1AE; --line: #2B3947;
+  --accent: #F0743F; --accent-ink: #1A0E08; --cold: #6FB0DC; --layer-a: #1D2934; --layer-b: #25333F;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  padding-block: 0 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+header { padding-block: 40px 28px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(2.3rem, 6vw, 3.6rem); line-height: 1.02; margin: 0 0 14px; text-wrap: balance; letter-spacing: -.01em; }
+.lead { max-width: 62ch; color: var(--muted); margin: 0; font-size: 1.05rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.tabs button {
+  font: 600 15px var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  padding: 10px 16px; cursor: pointer; border-radius: 4px;
+}
+.tabs button:hover { border-color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cold); outline-offset: 2px; }
+.panel { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.panel[hidden] { display: none; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 22px; min-width: 0; }
+h2 { font-family: var(--display); font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
+.formula { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: 0 0 18px; overflow-x: auto; white-space: nowrap; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field > span { font-size: 13px; font-weight: 500; color: var(--muted); }
+.inp { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); min-width: 0; }
+.inp:focus-within { border-color: var(--cold); }
+.inp input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--mono); padding: 9px 10px; outline-offset: 0; }
+.inp input:focus-visible { outline: none; }
+.inp .u { font: 13px var(--mono); color: var(--muted); padding: 0 10px; display: flex; align-items: center; border-left: 1px solid var(--line); white-space: nowrap; }
+select { font: 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 9px 8px; width: 100%; min-width: 0; }
+.layer { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.layer .nm { grid-column: 1 / -1; font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.out .hero { padding-bottom: 14px; margin-bottom: 8px; border-bottom: 2px solid var(--ink); display: flex; flex-direction: column; gap: 2px; }
+.out .hero .k { font-size: 13px; color: var(--muted); }
+.out .hero .v { font: 600 clamp(2rem, 5vw, 2.8rem)/1.1 var(--display); color: var(--accent); font-variant-numeric: tabular-nums; }
+.out .row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.out .row .k { color: var(--muted); font-size: 14px; min-width: 0; }
+.out .row .v { font: 500 15px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.out small { font: 13px var(--mono); color: var(--muted); margin-left: 6px; }
+.hint { color: var(--muted); margin: 0; }
+.chart { margin-top: 16px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .ax { fill: var(--muted); font: 11px var(--mono); }
+.chart .la { fill: var(--layer-a); } .chart .lb { fill: var(--layer-b); }
+.chart .sep { stroke: var(--line); stroke-width: 1; fill: none; }
+.chart .dot { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.chart-cap { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+.note { margin: 28px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+@media (max-width: 760px) {
+  .panel { grid-template-columns: minmax(0, 1fr); }
+  .card { padding: 18px; }
+}
+@media (max-width: 420px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .layer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .layer .field:first-of-type { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Калькулятор тепловых процессов</p>
+    <h1>Теплорасчёт</h1>
+    <p class="lead">Три типовых расчёта инженера-теплотехника: сколько энергии и времени нужно на нагрев, как падает температура в слоях стенки и сколько тепла уходит с поверхности. Все величины в единицах СИ.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Тип расчёта">
+    <button role="tab" id="t-heating" data-tab="heating" aria-selected="true" aria-controls="p-heating">Нагрев тела</button>
+    <button role="tab" id="t-wall" data-tab="wall" aria-selected="false" aria-controls="p-wall">Многослойная стенка</button>
+    <button role="tab" id="t-surface" data-tab="surface" aria-selected="false" aria-controls="p-surface">Конвекция и излучение</button>
+  </nav>
+
+  <!-- Нагрев тела -->
+  <section class="panel" id="p-heating" role="tabpanel" aria-labelledby="t-heating">
+    <div class="card">
+      <h2>Нагрев тела</h2>
+      <p class="formula">Q = c · m · (T₂ − T₁),  τ = Q / (P · η)</p>
+      <div class="fields">
+        <label class="field wide"><span>Материал</span>
+          <select id="h-mat"></select></label>
+        <label class="field"><span>Масса</span><div class="inp"><input id="h-m" inputmode="decimal" value="100"><span class="u">кг</span></div></label>
+        <label class="field"><span>Удельная теплоёмкость</span><div class="inp"><input id="h-c" inputmode="decimal" value="4187"><span class="u">Дж/(кг·К)</span></div></label>
+        <label class="field"><span>Начальная температура</span><div class="inp"><input id="h-t1" inputmode="decimal" value="15"><span class="u">°C</span></div></label>
+        <label class="field"><span>Конечная температура</span><div class="inp"><input id="h-t2" inputmode="decimal" value="60"><span class="u">°C</span></div></label>
+        <label class="field"><span>Мощность нагревателя</span><div class="inp"><input id="h-p" inputmode="decimal" value="12"><span class="u">кВт</span></div></label>
+        <label class="field"><span>КПД нагрева</span><div class="inp"><input id="h-e" inputmode="decimal" value="90"><span class="u">%</span></div></label>
+      </div>
+    </div>
+    <div class="card out" id="h-out" aria-live="polite"></div>
+  </section>
+
+  <!-- Многослойная стенка -->
+  <section class="panel" id="p-wall" role="tabpanel" aria-labelledby="t-wall" hidden>
+    <div class="card">
+      <h2>Многослойная стенка</h2>
+      <p class="formula">R = Σ δᵢ/λᵢ,  q = (T₁ − T₂) / R,  Q = q · A</p>
+      <div class="fields">
+        <label class="field"><span>Температура внутри</span><div class="inp"><input id="w-tin" inputmode="decimal" value="20"><span class="u">°C</span></div></label>
+        <label class="field"><span>Температура снаружи</span><div class="inp"><input id="w-tout" inputmode="decimal" value="-25"><span class="u">°C</span></div></label>
+        <label class="field wide"><span>Площадь стенки</span><div class="inp"><input id="w-a" inputmode="decimal" value="12"><span class="u">м²</span></div></label>
+        <div class="layer" data-i="1">
+          <span class="nm">Слой 1, от внутренней стороны</span>
+          <label class="field"><span>Материал</span><select class="w-mat"></select></label>
+          <label class="field"><span>Толщина</span><div class="inp"><input class="w-d" inputmode="decimal" value="380"><span class="u">мм</span></div></label>
+          <label class="field"><span>λ</span><div class="inp"><input class="w-l" inputmode="decimal" value="0.7"><span class="u">Вт/(м·К)</span></div></label>
+        </div>
+        <div class="layer" data-i="2">
+          <span class="nm">Слой 2</span>
+          <label class="field"><span>Материал</span><select class="w-mat"></select></label>
+          <label class="field"><span>Толщина</span><div class="inp"><input class="w-d" inputmode="decimal" value="100"><span class="u">мм</span></div></label>
+          <label class="field"><span>λ</span><div class="inp"><input class="w-l" inputmode="decimal" value="0.045"><span class="u">Вт/(м·К)</span></div></label>
+        </div>
+        <div class="layer" data-i="3">
+          <span class="nm">Слой 3, толщина 0 отключает слой</span>
+          <label class="field"><span>Материал</span><select class="w-mat"></select></label>
+          <label class="field"><span>Толщина</span><div class="inp"><input class="w-d" inputmode="decimal" value="20"><span class="u">мм</span></div></label>
+          <label class="field"><span>λ</span><div class="inp"><input class="w-l" inputmode="decimal" value="0.87"><span class="u">Вт/(м·К)</span></div></label>
+        </div>
+      </div>
+    </div>
+    <div class="card out" aria-live="polite">
+      <div id="w-out"></div>
+      <div class="chart" id="w-chart"></div>
+    </div>
+  </section>
+
+  <!-- Конвекция и излучение -->
+  <section class="panel" id="p-surface" role="tabpanel" aria-labelledby="t-surface" hidden>
+    <div class="card">
+      <h2>Конвекция и излучение</h2>
+      <p class="formula">Q = α·A·(Tₚ − Tж) + ε·σ·A·(Tₚ⁴ − Tₒ⁴)</p>
+      <div class="fields">
+        <label class="field"><span>Температура поверхности</span><div class="inp"><input id="s-ts" inputmode="decimal" value="80"><span class="u">°C</span></div></label>
+        <label class="field"><span>Температура среды</span><div class="inp"><input id="s-tf" inputmode="decimal" value="20"><span class="u">°C</span></div></label>
+        <label class="field"><span>Температура окружающих стен</span><div class="inp"><input id="s-te" inputmode="decimal" value="20"><span class="u">°C</span></div></label>
+        <label class="field"><span>Площадь поверхности</span><div class="inp"><input id="s-a" inputmode="decimal" value="1.5"><span class="u">м²</span></div></label>
+        <label class="field"><span>Коэффициент теплоотдачи α</span><div class="inp"><input id="s-al" inputmode="decimal" value="10"><span class="u">Вт/(м²·К)</span></div></label>
+        <label class="field"><span>Степень черноты ε</span><div class="inp"><input id="s-eps" inputmode="decimal" value="0.9"><span class="u">0…1</span></div></label>
+      </div>
+    </div>
+    <div class="card out" id="s-out" aria-live="polite"></div>
+  </section>
+
+  <p class="note">Расчёт стационарный и одномерный: температуры не меняются во времени, тепло идёт перпендикулярно слоям, контакт между слоями считается идеальным. Для нагрева не учитываются потери в окружающую среду, кроме заданного КПД. Значения материалов справочные и округлённые, для проекта берите данные из нормативов и паспортов материалов.</p>
+</div>
+
+<script>
+const SIGMA = 5.670374e-8;
+const $ = id => document.getElementById(id);
+const num = el => { const v = parseFloat(String(el.value).replace(',', '.')); return isFinite(v) ? v : NaN; };
+const fmt = (x, d = 4) => isFinite(x) ? x.toLocaleString('ru-RU', { maximumSignificantDigits: d }) : '—';
+const row = (k, v, u, hero) => `<div class="${hero ? 'hero' : 'row'}"><span class="k">${k}</span><span class="v">${v}${u ? `<small>${u}</small>` : ''}</span></div>`;
+const hint = t => `<p class="hint">${t}</p>`;
+const fmtTime = s => { const m = Math.round(s / 60); if (m < 60) return m + ' мин'; return Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
+
+/* ---------- Нагрев тела ---------- */
+const HEAT_MAT = [
+  ['Вода', 4187], ['Минеральное масло', 1900], ['Лёд', 2100], ['Сталь', 460],
+  ['Алюминий', 900], ['Медь', 385], ['Воздух', 1005], ['Свой материал', '']
+];
+const hMat = $('h-mat');
+hMat.innerHTML = HEAT_MAT.map((m, i) => `<option value="${i}">${m[0]}${m[1] ? ' — ' + m[1] + ' Дж/(кг·К)' : ''}</option>`).join('');
+hMat.addEventListener('change', () => {
+  const c = HEAT_MAT[+hMat.value][1];
+  if (c !== '') $('h-c').value = c;
+  calcHeat();
+});
+$('h-c').addEventListener('input', () => {
+  const c = num($('h-c'));
+  const i = HEAT_MAT.findIndex(m => m[1] === c);
+  hMat.value = i >= 0 ? i : HEAT_MAT.length - 1;
+});
+function calcHeat() {
+  const m = num($('h-m')), c = num($('h-c')), t1 = num($('h-t1')), t2 = num($('h-t2')), p = num($('h-p')), e = num($('h-e')) / 100;
+  const out = $('h-out');
+  if ([m, c, t1, t2].some(isNaN) || m <= 0 || c <= 0) { out.innerHTML = hint('Введите массу и теплоёмкость больше нуля.'); return; }
+  const Q = c * m * (t2 - t1);
+  let html = '';
+  if (Q >= 0) {
+    html += row('Нужно теплоты', fmt(Q / 1e6), 'МДж', true);
+  } else {
+    html += row('Тело отдаёт теплоты', fmt(-Q / 1e6), 'МДж', true);
+  }
+  html += row('То же в киловатт-часах', fmt(Math.abs(Q) / 3.6e6), 'кВт·ч');
+  html += row('Изменение температуры', fmt(t2 - t1), 'К');
+  if (Q > 0 && p > 0 && e > 0 && e <= 1) {
+    const sec = Q / (p * 1000 * e);
+    html += row('Время нагрева', fmtTime(sec), '');
+    html += row('Электроэнергия из сети', fmt(Q / 3.6e6 / e), 'кВт·ч');
+  } else if (Q > 0) {
+    html += hint('Для времени нагрева укажите мощность больше нуля и КПД от 1 до 100 %.');
+  }
+  out.innerHTML = html;
+}
+
+/* ---------- Многослойная стенка ---------- */
+const WALL_MAT = [
+  ['Кирпич керамический', 0.7], ['Бетон', 1.7], ['Минеральная вата', 0.045], ['Пенополистирол', 0.038],
+  ['Штукатурка цементно-песчаная', 0.87], ['Сталь', 50], ['Стекло', 1.0], ['Сосна поперёк волокон', 0.15], ['Свой материал', '']
+];
+const wDefaults = [0, 2, 4];
+document.querySelectorAll('.layer').forEach((L, k) => {
+  const sel = L.querySelector('.w-mat'), lam = L.querySelector('.w-l');
+  sel.innerHTML = WALL_MAT.map((m, i) => `<option value="${i}">${m[0]}</option>`).join('');
+  sel.value = wDefaults[k];
+  sel.addEventListener('change', () => { const l = WALL_MAT[+sel.value][1]; if (l !== '') lam.value = l; calcWall(); });
+  lam.addEventListener('input', () => {
+    const v = num(lam); const i = WALL_MAT.findIndex(m => m[1] === v);
+    sel.value = i >= 0 ? i : WALL_MAT.length - 1;
+  });
+});
+function calcWall() {
+  const tin = num($('w-tin')), tout = num($('w-tout')), A = num($('w-a'));
+  const out = $('w-out'), chart = $('w-chart');
+  const layers = [];
+  document.querySelectorAll('.layer').forEach(L => {
+    const d = num(L.querySelector('.w-d')) / 1000, l = num(L.querySelector('.w-l'));
+    if (d > 0 && l > 0) layers.push({ d, l, name: WALL_MAT[+L.querySelector('.w-mat').value][0], i: L.dataset.i });
+  });
+  if (isNaN(tin) || isNaN(tout) || !(A > 0) || !layers.length) {
+    out.innerHTML = hint('Укажите температуры, площадь больше нуля и хотя бы один слой с толщиной и λ больше нуля.');
+    chart.innerHTML = ''; return;
+  }
+  const R = layers.reduce((s, x) => s + x.d / x.l, 0);
+  const q = (tin - tout) / R;
+  const temps = [tin];
+  layers.forEach(x => temps.push(temps[temps.length - 1] - q * x.d / x.l));
+  const total = layers.reduce((s, x) => s + x.d, 0) * 1000;
+  let html = row('Тепловой поток через стенку', fmt(q * A), 'Вт', true);
+  html += row('Плотность потока q', fmt(q), 'Вт/м²');
+  html += row('Сопротивление теплопередаче R', fmt(R), 'м²·К/Вт');
+  html += row('Коэффициент теплопередачи U', fmt(1 / R), 'Вт/(м²·К)');
+  html += row('Толщина стенки', fmt(total), 'мм');
+  html += row('Внутренняя поверхность', fmt(temps[0]), '°C');
+  for (let i = 0; i < layers.length - 1; i++) html += row(`Граница слоёв ${i + 1} и ${i + 2}`, fmt(temps[i + 1]), '°C');
+  html += row('Наружная поверхность', fmt(temps[temps.length - 1]), '°C');
+  out.innerHTML = html;
+  chart.innerHTML = drawWall(layers, temps, tin, tout) + '<p class="chart-cap">Температура по толщине стенки. Слои показаны в масштабе толщины, цвет линии идёт от горячей стороны к холодной.</p>';
+}
+function drawWall(layers, temps, tin, tout) {
+  const W = 600, H = 230, L = 52, R = 16, T = 16, B = 34, iw = W - L - R, ih = H - T - B;
+  const tot = layers.reduce((s, x) => s + x.d, 0);
+  const lo = Math.min(tin, tout), hi = Math.max(tin, tout), span = (hi - lo) || 1;
+  const y = t => T + ih * (1 - (t - lo) / span);
+  let acc = 0, rects = '', seps = '', pts = [];
+  layers.forEach((x, i) => {
+    const xa = L + iw * acc / tot, w = iw * x.d / tot;
+    rects += `<rect x="${xa.toFixed(1)}" y="${T}" width="${w.toFixed(1)}" height="${ih}" class="${i % 2 ? 'lb' : 'la'}"/>`;
+    if (i === 0) pts.push([xa, y(temps[0])]);
+    pts.push([xa + w, y(temps[i + 1])]);
+    if (i < layers.length - 1) seps += `<line x1="${(xa + w).toFixed(1)}" x2="${(xa + w).toFixed(1)}" y1="${T}" y2="${T + ih}" class="sep"/>`;
+    acc += x.d;
+  });
+  const leftHot = tin >= tout;
+  const c1 = leftHot ? 'var(--accent)' : 'var(--cold)', c2 = leftHot ? 'var(--cold)' : 'var(--accent)';
+  const line = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" class="dot"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="График температуры по толщине стенки">
+    <defs><linearGradient id="wg" gradientUnits="userSpaceOnUse" x1="${L}" x2="${L + iw}" y1="0" y2="0">
+      <stop offset="0" style="stop-color:${c1}"/><stop offset="1" style="stop-color:${c2}"/></linearGradient></defs>
+    ${rects}${seps}
+    <polyline points="${line}" fill="none" stroke="url(#wg)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text class="ax" x="${L - 8}" y="${T + 4}" text-anchor="end">${fmt(hi, 3)}</text>
+    <text class="ax" x="${L - 8}" y="${T + ih + 4}" text-anchor="end">${fmt(lo, 3)}</text>
+    <text class="ax" x="${L - 8}" y="${T + ih / 2 + 4}" text-anchor="end">°C</text>
+    <text class="ax" x="${L}" y="${H - 10}" text-anchor="start">0 мм</text>
+    <text class="ax" x="${L + iw}" y="${H - 10}" text-anchor="end">${fmt(tot * 1000, 4)} мм</text>
+  </svg>`;
+}
+
+/* ---------- Конвекция и излучение ---------- */
+function calcSurface() {
+  const ts = num($('s-ts')), tf = num($('s-tf')), te = num($('s-te')), A = num($('s-a')), al = num($('s-al')), eps = num($('s-eps'));
+  const out = $('s-out');
+  if ([ts, tf, te, A, al, eps].some(isNaN) || A <= 0 || al < 0 || eps < 0 || eps > 1) {
+    out.innerHTML = hint('Площадь должна быть больше нуля, α не меньше нуля, степень черноты от 0 до 1.'); return;
+  }
+  if (ts <= -273.15 || tf <= -273.15 || te <= -273.15) { out.innerHTML = hint('Температура не может быть ниже абсолютного нуля (−273,15 °C).'); return; }
+  const k = t => t + 273.15;
+  const qc = al * A * (ts - tf);
+  const qr = eps * SIGMA * A * (Math.pow(k(ts), 4) - Math.pow(k(te), 4));
+  const tot = qc + qr;
+  const dir = tot >= 0 ? 'Потери тепла с поверхности' : 'Поверхность получает тепло';
+  let html = row(dir, fmt(Math.abs(tot)), 'Вт', true);
+  html += row('Конвекция', fmt(qc), 'Вт');
+  html += row('Излучение', fmt(qr), 'Вт');
+  if (tot !== 0) html += row('Доля излучения', fmt(100 * qr / tot, 3), '%');
+  html += row('Плотность потока', fmt(tot / A), 'Вт/м²');
+  if (Math.abs(ts - te) > 1e-9) html += row('Коэффициент теплоотдачи излучением', fmt(qr / (A * (ts - te)), 3), 'Вт/(м²·К)');
+  out.innerHTML = html;
+}
+
+/* ---------- Подключение ---------- */
+const calcs = { heating: calcHeat, wall: calcWall, surface: calcSurface };
+document.querySelectorAll('.panel').forEach(p => {
+  const name = p.id.slice(2);
+  p.addEventListener('input', calcs[name]);
+  p.addEventListener('change', calcs[name]);
+});
+const tabNames = Object.keys(calcs);
+function show(name) {
+  if (!tabNames.includes(name)) name = 'heating';
+  tabNames.forEach(n => {
+    $('p-' + n).hidden = n !== name;
+    $('t-' + n).setAttribute('aria-selected', n === name ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.tab; show(b.dataset.tab); }));
+window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+Object.values(calcs).forEach(f => f());
+show(location.hash.slice(1));
+</script>
+</body>
+</html>
